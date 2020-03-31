@@ -153,14 +153,14 @@ cases):
 risks %>% head %>% kable
 ```
 
-| municipio            |    id | pop\_receptive | total\_pop | p\_receptive |
-| :------------------- | ----: | -------------: | ---------: | -----------: |
+| municipio            | id    | pop\_receptive | total\_pop | p\_receptive |
+| :------------------- | :---- | -------------: | ---------: | -----------: |
 | Riba de Escalote, La | 42157 |             10 |         18 |     55.55556 |
 | Olmeda de la Cuesta  | 16140 |             18 |         37 |     48.64865 |
 | Ciruelos del Pinar   | 19089 |             16 |         34 |     47.05882 |
 | Valdemadera          | 26161 |              4 |          9 |     44.44444 |
-| Tormellas            |  5244 |             28 |         65 |     43.07692 |
-| Tórtoles             |  5246 |             30 |         73 |     41.09589 |
+| Tormellas            | 05244 |             28 |         65 |     43.07692 |
+| Tórtoles             | 05246 |             30 |         73 |     41.09589 |
 
 The below shows the distribution of percentage of people 80 or older by
 municipality.

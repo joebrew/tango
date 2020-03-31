@@ -4,6 +4,10 @@ library(usethis)
 library(raster)
 library(sp)
 library(rgdal)
+library(readxl)
+
+# Municipal codes
+codes <- read_excel('20codmun.xlsx', skip = 1)
 
 ## Get Spanish census data
 # Population by age and municipality
@@ -37,11 +41,11 @@ census$edad <- gsub(' y más', '', census$edad)
 census$edad <- as.numeric(as.character(census$edad))
 
 census$id <- unlist(lapply(strsplit(census$municipio, ' '),
-                                  function(x){paste0(x[1], collapse = ' ')}))
+                           function(x){paste0(x[1], collapse = ' ')}))
 census$id <- trimws(census$id)
-census$id <- as.numeric(census$id)
+# census$id <- as.numeric(census$id)
 census$municipio <- unlist(lapply(strsplit(census$municipio, ' '),
-                           function(x){paste0(x[2:length(x)], collapse = ' ')}))
+                                  function(x){paste0(x[2:length(x)], collapse = ' ')}))
 census$municipio <- trimws(census$municipio)
 usethis::use_data(census, overwrite = TRUE)
 
@@ -57,13 +61,13 @@ census_ids <- sort(unique(census$id))
 census_ids <- sample(census_ids, length(census_ids))
 ids <- substr(municipios$INSPIREID, 20, 24)
 
-municipios$id <- as.numeric(ids)
+municipios$id <- ids
 usethis::use_data(municipios, overwrite = TRUE)
 
 # World cities
 cities <- read_csv('worldcities.csv')
 cities <- cities %>% filter(country == 'Spain')
-cities <- cities %>% dplyr::select(city, lat, lng, population)
+cities <- citie %>% dplyr::select(city, lat, lng, population)
 cities_sp <- cities %>% dplyr::mutate(x = lng, y = lat)
 coordinates(cities_sp) <- ~x+y
 proj4string(cities_sp) <- proj4string(municipios)
