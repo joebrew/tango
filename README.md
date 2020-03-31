@@ -255,59 +255,57 @@ Time to do the other three tasks:
 For vulnerability, we want to estimate how much movement there is
 between each municipality and other areas. We could do this with raw
 data from, for example, mobile networks. But until we have those data,
-we’ll use a more simple metric: weighted-distance to nearby population
-centers.
+we’ll use a more simple metric: how many nearby population centers of
+mobile people are there.
 
-Essentially, “vulnerability” means how close you are to large population
-centers and how large those population centers are. So, a town that is
-15 minutes away from Manresa likely has some intermingling with Manresa;
-by the same token, a town adjoining Madrid likely has lots of
-intermingliing with Madrid.
+Let’s call a population center any place with a population of \>5,000
+people. And let’s say nearby = 20km. And let’s say “mobile people” are
+those between ages 18 and 65.
 
-Our weighting function looks like this:
+Here are the population centers:
 
 ``` r
-weighter <- function(x){1 / (x^(1/1.3))}
-population_weighter <- function(x){x ^(1/2)}
-x <- 1:150
-y <- weighter(x)
-df <- tibble(x,y)
-ggplot(data = df,
-       aes(x = x, y = y)) +
-  geom_line() +
-  theme_simple() +
-  labs(x = 'Distance from city',
-       y = 'Relative weight',
-       title = 'How we understand the importance of proximity')
+library(geosphere)
+# Get cities populations
+cities_sp <- census %>%
+  filter(edad >= 18,
+         edad <= 65) %>%
+  group_by(id, municipio) %>%
+  summarise(population = sum(total, na.rm = TRUE)) %>%
+  ungroup %>%
+  filter(population >= 5000)
+# Get locations
+x <- municipios
+x@data <- left_join(x@data, cities_sp)
+x <- x[!is.na(x@data$population),]
+
+plot(municipios)
+plot(x, add = T, col = 'red')
 ```
 
 <img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
 
-We’ll define vulnerability as the sum of the population of all nearby
-(\<150km) population centers weighted by the distance. We calculate this
-for every municipality by creating a matrix of distances from
-municipality centroids to the nearby (\<150km) population centers.
-
 ``` r
-# Get cities locations and populations
-cities_sp <- tango::cities_sp
+cities_sp <- x
 # Define matrix of distances
-distances <- rgeos::gDistance(spgeom1 = municipios,
-                              cities_sp,
-                              byid = T)
+distances <- geosphere::distm(x = coordinates(municipios),
+                              y = coordinates(cities_sp),
+                              fun = distHaversine)
+distances <- t(distances)
+# distances <- rgeos::gDistance(spgeom1 = municipios,
+#                               cities_sp,
+#                               byid = T)
 out <- rep(NA, ncol(distances))
 for(j in 1:ncol(distances)){
   this_municipality <- municipios@data$NAMEUNIT[j] 
   distance_values <- distances[,j]
-  keeps <- which(distance_values < 150)
-  weighted <- population_weighter(cities_sp@data$population[keeps]) * weighter(distance_values[keeps])
-  # Adjust inf
-  weighted <- ifelse(is.infinite(weighted), 2000, weighted)
-  out[j] <- sum(weighted)
+  keeps <- which(distance_values < 20000)
+  n <- length(keeps)
+  out[j] <- n
 }
 # Now, for every municipality, we have a vulnerability score
 map <- municipios
-map@data$vulnerability <- out
+map@data$vulnerability <- sqrt(out)
 ```
 
 Having calculated vulnerability score, let’s visualize
