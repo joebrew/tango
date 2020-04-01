@@ -44,18 +44,28 @@ mobile_app_ui <- function(request) {
             sliderInput('receptivity_age',
                         'Age of "receptivity"',
                         min = 40, max = 100,
-                        value = c(60, 100)),
-            sliderInput('vulnerability',
+                        value = c(80, 100)),
+            sliderInput('vulnerability_age',
                         'Age of "vulnerability"',
                         min = 0, max = 100,
                         value = c(20, 50)),
             checkboxInput('overlay_deaths',
                      'Overlay observed deaths at CA level?',
                       value = FALSE),
-            actionButton('generate_map',
+            selectInput('show',
+                        'Show on map:',
+                        choices = c('Receptivity',
+                                    'Vulnerability',
+                                    'Product of receptivity and vulnerability (combined index)')),
+            br(),
+            f7Button('generate_map',
                          'Generate map'),
-            actionButton('clear_map',
+            br(),
+            helpText('Note: generating the map may take up to 30 seconds. Be patient'),
+            br(),
+            f7Button('clear_map',
                          'Clear map'),
+            br(),
             leafletOutput('the_plot', height = '500px'),
             DT::dataTableOutput('the_table'),
             height = 500
@@ -127,15 +137,24 @@ mobile_golem_add_external_resources <- function(){
 #' @import leaflet
 mobile_app_server <- function(input, output, session) {
   
-  define_receptivity <- function(data, n){
+  define_receptivity <- function(data, n1, n2){
     data %>%
-      mutate(receptive = edad >= n) %>%
+      mutate(receptive = edad >= n1 & edad <= n2) %>%
       summarise(pop_receptive = sum(total[receptive], na.rm = TRUE),
                 total_pop = sum(total, na.rm = TRUE)) %>%
       ungroup %>%
       mutate(p_receptive = pop_receptive / total_pop * 100)
   }
+  define_vulnerability <- function(data, n1, n2){
+    data %>%
+      mutate(vulnerable = edad >= n1 & edad <= n2) %>%
+      summarise(pop_vulnerable = sum(total[vulnerable], na.rm = TRUE),
+                total_pop = sum(total, na.rm = TRUE)) %>%
+      ungroup %>%
+      mutate(p_vulnerable = pop_vulnerable / total_pop * 100)
+  }
   
+  data_list <- reactiveValues(data = data.frame())
   
   output$the_plot <- renderLeaflet({
     leaflet() %>%
@@ -144,13 +163,76 @@ mobile_app_server <- function(input, output, session) {
   })
   
   output$the_table <- DT::renderDataTable({
-    tibble(a = 1:5, b = 2:6)
+    out <- data_list$data
+    if(!is.null(out)){
+      if(nrow(out) > 0){
+        out <- out  %>% dplyr::select(id, municipio,
+                                      pop_receptive,
+                                      pop_vulnerable,
+                                      p_receptive,
+                                      p_vulnerable,
+                                      total_pop)
+      }
+    }
+    out 
   })
   
   observeEvent(input$generate_map, {
+    
+    # Get receptivity
+    ns <- input$receptivity_age
+    message('check1')
+    risks <- census %>%
+      group_by(municipio, id) %>%
+      define_receptivity(n1 = ns[1],
+                         n2 = ns[2]) %>%
+      arrange(desc(p_receptive))
+    message('check2')
+
+    map <- municipios
+    map@data <- left_join(map@data, risks, by = 'id')
+    message('check3')
+    # Define vulnerability
+    ns <- input$vulnerability_age
+    message('check4')
+    save(ns, file = '/tmp/temp.RData')
+    vulns <- census %>%
+      group_by(municipio, id) %>%
+      define_vulnerability(n1 = ns[1],
+                         n2 = ns[2]) %>%
+      arrange(desc(p_vulnerable))
+    
+    map <- municipios
+    map@data <- left_join(map@data, risks, by = 'id')
+    map@data <- left_join(map@data, vulns %>% dplyr::select(id, pop_vulnerable,
+                                                             p_vulnerable), by = 'id')
+    map@data$combined <- map@data$p_vulnerable * map@data$p_receptive
+    
+    show <- input$show
+    if(show == 'Receptivity'){
+      map@data$var <- map@data$p_receptive
+    } else if(show == 'Vulnerability'){
+      map@data$var <- map@data$p_vulnerable 
+    } else {
+      map@data$var <- map@data$combined
+    }
+    
+    data_list$data <- map@data
+    
+    
+    p_popup <- paste0(map@data$NAMEUNIT, ': Percent ', show, ': ',  round(map@data$var, digits = 2))
+
+    pal_fun <- colorQuantile("YlOrRd", NULL, n = 8)
     leafletProxy("the_plot") %>%
       clearControls() %>%
-      clearShapes() %>% addPolygons(data = esp1)
+      clearShapes() %>% 
+        addPolygons(
+          # highlightOptions = highlightOptions(stroke = 4, weight = 2),
+          data = map,
+          stroke = FALSE, # remove polygon borders
+          fillColor = ~pal_fun(var), # set fill color with function from above and value
+          fillOpacity = 0.8, smoothFactor = 0.5, # make it nicer
+          label = p_popup)
       
   })
   
