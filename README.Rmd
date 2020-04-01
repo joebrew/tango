@@ -105,6 +105,8 @@ municipios <- tango::municipios
 
 We'll define a function for getting "receptivity" (ie, age-based risk) for each municipality. In this first iteration, we'll just set it as the percentage of people who are above age `n`
 
+We'll define a function for getting "receptivity" (ie, age-based risk) for each municipality. In this first iteration, we'll just set it as the percentage of people who are above age `n`
+
 ```{r}
 define_receptivity <- function(data, n){
   data %>%
@@ -138,7 +140,7 @@ ggplot(data = risks,
        aes(x = p_receptive)) +
   geom_density(fill = 'darkorange', alpha = 0.6) +
   theme_simple() +
-  geom_text(data = tibble(x = c(12, 40),
+  geom_text(data = tibble(x = c(8, 30),
                           y = c(0.01, 0.01),
                           label = c('Very many\nlow-receptivity municipalities\n(can have more relaxed measures)',
                                       'Very few especially\nhigh-receptivity municipalities\n(need tighter measures)')),
@@ -203,11 +205,12 @@ Time to do the other three tasks:
 - B1. Susceptibility
 - B2. Spatial-temporal risk
 
+
 # Vulnerability
 
 For vulnerability, we want to estimate how much movement there is between each municipality and other areas. We could do this with raw data from, for example, mobile networks. But until we have those data, we'll use a more simple metric: how many nearby population centers of mobile people are there.
 
-Let's call a population center any place with a population of >5,000 people. And let's say nearby = 20km. And let's say "mobile people" are those between ages 18 and 65.
+Let's call a population center any place with a population of >5,000 "mobile" people. And let's say nearby = 20km or less. And let's say "mobile people" are those between ages 18 and 65. The assumption is that being near these people makes a town more "vulnerable". This notion could obviously be improved.
 
 Here are the population centers:
 
@@ -278,17 +281,15 @@ spplot(map, 'index', par.settings = list(axis.line = list(col ="transparent")), 
 ```
 
 
-Great. We have some concept of vulnerability and vulnerability, and we build a basic index on both. We're two steps in the right direction.
+Great. We have some concept of susceptibility and vulnerability, and we build a basic index on both. We're two steps in the right direction.
 
-But the index can be improved. Being close to other populations (ie, being "vulnerable") only matters if those other populations are infectious. Which brings us to our next steps...
+But the index can be improved. Being close to other populations (ie, being "vulnerable") only matters if (a) the population in question is susceptible and (b) if the nearby populations are infectious. Which brings us to our next steps...
 
 # Next steps
 
-What's next? We need to assess (1) susceptibility and (1) spatial-temporal risk. Urgently
+What's next? We need to assess (1) susceptibility and (2) spatial-temporal risk.
 
-For (1), we need funds and a team to start preparations for mass serology. Sampling strategy and timing will be fundamental to getting actionable data. This will almost certainly be the most expensive, but also most important, part of this work.
-
-For (2), we need the Ministry of Health to release municipality-level data as soon as possible. This should be granular (ie, a dataset with one row per case, with variables including municipality, date of symptom onset, age, sex, place of diagnosis).
+To assess susceptibility, we need to do mass serology. This should be informed by the "risk" of each area. To assess spatial-temporal risk, we need granular, live, epi data (ie, a dataset with one row per case, with variables including municipality, date of symptom onset, age, sex, place of diagnosis).
 
 # Technical set-up
 

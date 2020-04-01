@@ -5,6 +5,14 @@ library(raster)
 library(sp)
 library(rgdal)
 library(readxl)
+library(rmapshaper)
+library(sf)
+
+esp0 <- getData(country = 'ESP', level = 0)
+usethis::use_data(esp0, overwrite = TRUE)
+
+esp1 <- getData(country = 'ESP', level = 1)
+usethis::use_data(esp1, overwrite = TRUE)
 
 # Municipal codes
 codes <- read_excel('20codmun.xlsx', skip = 1)
@@ -56,6 +64,15 @@ usethis::use_data(census, overwrite = TRUE)
 # unzip('lineas_limite.zip')
 municipios <- readOGR('recintos_municipales_inspire_peninbal_etrs89',
                       'recintos_municipales_inspire_peninbal_etrs89', encoding="UTF-8")
+# municipios <- st_read('recintos_municipales_inspire_peninbal_etrs89/recintos_municipales_inspire_peninbal_etrs89.shp')
+# municipios <- read_sf('recintos_municipales_inspire_peninbal_etrs89/recintos_municipales_inspire_peninbal_etrs89.shp')
+library(rgeos)
+regions_df <- municipios@data
+x = gSimplify(municipios, tol = 0.05, topologyPreserve = TRUE)
+
+municipios <- sp::SpatialPolygonsDataFrame(x, regions_df)
+
+
 # Get an ID in municipios
 census_ids <- sort(unique(census$id))
 census_ids <- sample(census_ids, length(census_ids))
