@@ -34,32 +34,35 @@ mobile_app_ui <- function(request) {
         ),
         toolbar = f7Toolbar(
           position = "bottom",
-          f7Link(label = "Databrew", src = "https://databrew.cc", external = TRUE)
+          f7Link(label = "Carlos Chaccour", src = "https://www.isglobal.org/person?p_p_id=viewpersona_WAR_intranetportlet&p_p_lifecycle=0&p_p_col_id=column-1&p_p_col_count=1&_viewpersona_WAR_intranetportlet_struts_action=%2Fview%2FpersonaView&_viewpersona_WAR_intranetportlet_personaId=7304", external = TRUE),
+          f7Link(label = "Joe Brew", src = "https://databrew.cc", external = TRUE)
+          
         ),
         # main content
         f7Shadow(
           intensity = 10,
           hover = TRUE,
           f7Card(
-            sliderInput('receptivity_age',
-                        'Age of "receptivity"',
-                        min = 40, max = 100,
-                        value = c(80, 100)),
-            sliderInput('vulnerability_age',
-                        'Age of "vulnerability"',
+            sliderInput('age_at_risk',
+                        'Age of "risk"',
                         min = 0, max = 100,
-                        value = c(20, 50)),
+                        value = c(80, 100)),
+            # sliderInput('vulnerability_age',
+            #             'Age of "vulnerability"',
+            #             min = 0, max = 100,
+            #             value = c(20, 50)),
             checkboxInput('overlay_deaths',
                      'Overlay observed deaths at CA level?',
                       value = FALSE),
             selectInput('show',
                         'Show on map:',
-                        choices = c('Receptivity',
-                                    'Vulnerability',
-                                    'Product of receptivity and vulnerability (combined index)')),
+                        choices = c('Risk'#,
+                                    # 'Vulnerability'
+                                    )),
+                                    # 'Product of receptivity and vulnerability (combined index)')),
             br(),
             f7Button('generate_map',
-                         'Generate map'),
+                         'Generate map and tables'),
             br(),
             helpText('Note: generating the map may take up to 30 seconds. Be patient'),
             br(),
@@ -68,6 +71,19 @@ mobile_app_ui <- function(request) {
             br(),
             leafletOutput('the_plot', height = '500px'),
             DT::dataTableOutput('the_table'),
+            br(),
+            sliderInput('cut_off',
+                        'Cut-off threshold',
+                        min = 0, max = 100, value = 10),
+            DT::dataTableOutput('summary_table'),
+            
+            br(),
+            f7Button('generate_threshold_map',
+                     'Generate THRESHOLD map'),
+            br(),
+            helpText('Note: generating the map may take up to 30 seconds. Be patient'),
+            leafletOutput('threshold_plot', height = '500px'),
+            
             height = 500
           )
         )
@@ -137,26 +153,32 @@ mobile_golem_add_external_resources <- function(){
 #' @import leaflet
 mobile_app_server <- function(input, output, session) {
   
-  define_receptivity <- function(data, n1, n2){
+  define_risk <- function(data, n1, n2){
     data %>%
-      mutate(receptive = edad >= n1 & edad <= n2) %>%
-      summarise(pop_receptive = sum(total[receptive], na.rm = TRUE),
+      mutate(at_risk = edad >= n1 & edad <= n2) %>%
+      summarise(pop_at_risk = sum(total[at_risk], na.rm = TRUE),
                 total_pop = sum(total, na.rm = TRUE)) %>%
       ungroup %>%
-      mutate(p_receptive = pop_receptive / total_pop * 100)
+      mutate(p_at_risk = pop_at_risk / total_pop * 100)
   }
-  define_vulnerability <- function(data, n1, n2){
-    data %>%
-      mutate(vulnerable = edad >= n1 & edad <= n2) %>%
-      summarise(pop_vulnerable = sum(total[vulnerable], na.rm = TRUE),
-                total_pop = sum(total, na.rm = TRUE)) %>%
-      ungroup %>%
-      mutate(p_vulnerable = pop_vulnerable / total_pop * 100)
-  }
+  # define_vulnerability <- function(data, n1, n2){
+  #   data %>%
+  #     mutate(vulnerable = edad >= n1 & edad <= n2) %>%
+  #     summarise(pop_vulnerable = sum(total[vulnerable], na.rm = TRUE),
+  #               total_pop = sum(total, na.rm = TRUE)) %>%
+  #     ungroup %>%
+  #     mutate(p_vulnerable = pop_vulnerable / total_pop * 100)
+  # }
   
   data_list <- reactiveValues(data = data.frame())
   
   output$the_plot <- renderLeaflet({
+    leaflet() %>%
+      addTiles() %>%
+      addPolygons(data = esp0)
+  })
+  
+  output$threshold_plot <- renderLeaflet({
     leaflet() %>%
       addTiles() %>%
       addPolygons(data = esp0)
@@ -167,56 +189,53 @@ mobile_app_server <- function(input, output, session) {
     if(!is.null(out)){
       if(nrow(out) > 0){
         out <- out  %>% dplyr::select(id, municipio,
-                                      pop_receptive,
-                                      pop_vulnerable,
-                                      p_receptive,
-                                      p_vulnerable,
+                                      pop_at_risk,
+                                      # pop_vulnerable,
+                                      p_at_risk,
+                                      # p_vulnerable,
                                       total_pop)
       }
     }
     out 
   })
   
+  output$summary_table <- DT::renderDataTable({
+    cut_off <- input$cut_off
+    out <- data_list$data
+    pd <- NULL
+    if(!is.null(out)){
+      if(nrow(out) > 0){
+        pd <- out %>%
+          mutate(`Category` = ifelse(p_at_risk >= cut_off,
+                                     'Above threshold',
+                                     'Below threshold')) %>%
+          group_by(Category) %>%
+          summarise(`Number of municipalities` = n(),
+                    `Number of people in those municipalities` = sum(total_pop, na.rm = TRUE))
+      }
+    }
+    pd 
+  })
+  
   observeEvent(input$generate_map, {
     
     # Get receptivity
-    ns <- input$receptivity_age
+    ns <- input$age_at_risk
     message('check1')
     risks <- census %>%
       group_by(municipio, id) %>%
-      define_receptivity(n1 = ns[1],
+      define_risk(n1 = ns[1],
                          n2 = ns[2]) %>%
-      arrange(desc(p_receptive))
+      arrange(desc(p_at_risk))
     message('check2')
 
     map <- municipios
     map@data <- left_join(map@data, risks, by = 'id')
-    message('check3')
-    # Define vulnerability
-    ns <- input$vulnerability_age
-    message('check4')
-    save(ns, file = '/tmp/temp.RData')
-    vulns <- census %>%
-      group_by(municipio, id) %>%
-      define_vulnerability(n1 = ns[1],
-                         n2 = ns[2]) %>%
-      arrange(desc(p_vulnerable))
-    
+
     map <- municipios
     map@data <- left_join(map@data, risks, by = 'id')
-    map@data <- left_join(map@data, vulns %>% dplyr::select(id, pop_vulnerable,
-                                                             p_vulnerable), by = 'id')
-    map@data$combined <- map@data$p_vulnerable * map@data$p_receptive
-    
     show <- input$show
-    if(show == 'Receptivity'){
-      map@data$var <- map@data$p_receptive
-    } else if(show == 'Vulnerability'){
-      map@data$var <- map@data$p_vulnerable 
-    } else {
-      map@data$var <- map@data$combined
-    }
-    
+    map@data$var <- map@data$p_at_risk
     data_list$data <- map@data
     
     
@@ -234,6 +253,43 @@ mobile_app_server <- function(input, output, session) {
           fillOpacity = 0.8, smoothFactor = 0.5, # make it nicer
           label = p_popup)
       
+  })
+  
+  observeEvent(input$generate_threshold_map, {
+    
+    # Get receptivity
+    ns <- input$age_at_risk
+    risks <- census %>%
+      group_by(municipio, id) %>%
+      define_risk(n1 = ns[1],
+                  n2 = ns[2]) %>%
+      arrange(desc(p_at_risk))
+
+    map <- municipios
+    map@data <- left_join(map@data, risks, by = 'id')
+    
+    map <- municipios
+    map@data <- left_join(map@data, risks, by = 'id')
+    show <- input$show
+    map@data$var <- map@data$p_at_risk
+    threshold <- input$cut_off
+    map@data$var <- ifelse(map@data$var >= threshold, 'Above threshold',
+                           'Below threshold')
+
+    p_popup <- paste0(map@data$NAMEUNIT, ': Category ', show, ': ',  map@data$var)
+    
+    pal_fun <- colorFactor("YlOrRd", map@data$var, reverse = TRUE)
+    leafletProxy("threshold_plot") %>%
+      clearControls() %>%
+      clearShapes() %>% 
+      addPolygons(
+        # highlightOptions = highlightOptions(stroke = 4, weight = 2),
+        data = map,
+        stroke = FALSE, # remove polygon borders
+        fillColor = ~pal_fun(var), # set fill color with function from above and value
+        fillOpacity = 0.8, smoothFactor = 0.5, # make it nicer
+        label = p_popup)
+    
   })
   
   observeEvent(input$clear_map, {
