@@ -291,6 +291,8 @@ What's next? We need to assess (1) susceptibility and (2) spatial-temporal risk.
 
 To assess susceptibility, we need to do mass serology. This should be informed by the "risk" of each area. To assess spatial-temporal risk, we need granular, live, epi data (ie, a dataset with one row per case, with variables including municipality, date of symptom onset, age, sex, place of diagnosis).
 
+
+
 # Technical set-up
 
 This analysis is set-up as an R package. One can install it in one of two ways:

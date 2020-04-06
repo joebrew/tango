@@ -1,0 +1,287 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = NA, 
+               echo = TRUE, 
+               warning = FALSE, 
+               message = FALSE, 
+               error = TRUE, 
+               cache = FALSE,
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# Tango
+
+Chaccour and Brew
+
+
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
+<!-- badges: end -->
+
+
+```{r}
+# Load the package for this project
+library(tango)
+# Load other useful packages
+library(knitr)
+library(tidyr)
+library(dplyr)
+library(sp)
+library(ggplot2)
+library(RColorBrewer)
+
+# Get census age data
+census <- tango::census
+# Get municipios spatial data
+municipios <- tango::municipios
+
+
+# Get census age data
+census <- diadespres::census
+#43 = Tarragona
+#08 = Barcelona
+#25 = Lleida
+#17 = Girona
+catalan_codes <- c('43', '08', '25', '17')
+census <- census %>%
+  filter(substr(id, 1, 2) %in% catalan_codes)
+
+# Get municipios spatial data
+municipios <- diadespres::municipios
+municipios <- municipios[substr(municipios@data$id, 1, 2) %in% catalan_codes, ]
+
+# Order census by pop
+by_pop <- census %>%
+  group_by(id, municipio) %>%
+  summarise(pop = sum(total, na.rm = T)) %>%
+  ungroup %>%
+  arrange(desc(pop)) %>%
+  mutate(p = pop / sum(pop) * 100) %>%
+  mutate(cp = cumsum(p))
+
+areas <- rgeos::gArea(municipios, byid = T)
+
+# Make plot by percentage
+make_plot <- function(cut_off = 30){
+  sub_pop <- by_pop %>%
+    filter(cp <= cut_off)
+  keep <- municipios@data$id %in% sub_pop$id
+  keep_areas <- areas[keep]
+  sub_municipios <- municipios[keep,]
+  sub_municipios@data$area <- keep_areas
+  space_take_up <- round(sum(keep_areas) / sum(areas) * 100, digits = 1)
+  plot(municipios)
+  plot(sub_municipios, col = 'red', add = T)
+  title(main = paste0(max(round(sub_pop$cp)), '% of Catalans live in the red area (', space_take_up, ' % of area)' ))
+}
+
+for(i in c( seq(30, 90, by = 10), 92, 94, 96, 98, 99)){
+  make_plot(cut_off = i)
+}
+
+```
+
+## Plots for 2020-04-06
+
+### Population density
+
+```{r}
+# # Project municipalities
+# municipios_proj <- spTransform(municipios, CRS("+proj=lcc +lat_1=40 +lat_0=40 +lon_0=0 +k_0=0.9988085293 +x_0=600000 +y_0=600000 +a=6378298.3 +b=6356657.142669561 +pm=madrid +units=m +no_defs"))
+
+# Get area for each municipality
+areas_km <- raster::area(municipios) / 1000000
+
+# Add to municipios
+map <- municipios
+map@data$area_km <- areas_km
+
+# Get population numbers to plug into municipios
+right <- census %>%
+  group_by(id) %>%
+  summarise(pop = sum(total, na.rm = TRUE),
+            pop60 = sum(total[edad >= 60], na.rm = TRUE),
+            pop70 = sum(total[edad >= 70], na.rm = TRUE),
+            pop80 = sum(total[edad >= 80], na.rm = TRUE),
+            pop90 = sum(total[edad >= 90], na.rm = TRUE),
+            popl60 = sum(total[edad < 60], na.rm = TRUE),
+            popl70 = sum(total[edad < 70], na.rm = TRUE),
+            popl80 = sum(total[edad < 80], na.rm = TRUE),
+            popl90 = sum(total[edad < 90], na.rm = TRUE))
+  
+map@data <-
+  left_join(map@data,
+            right)
+
+map@data <- map@data %>%
+  mutate(pop_per_km = pop / area_km,
+         pop60_per_km = pop60 / area_km,
+         pop70_per_km = pop70 / area_km,
+         pop80_per_km = pop80 / area_km,
+         pop90_per_km = pop90 / area_km,
+         popl60_per_km = popl60 / area_km,
+         popl70_per_km = popl70 / area_km,
+         popl80_per_km = popl80 / area_km,
+         popl90_per_km = popl90 / area_km) %>%
+  mutate(ratio60 = popl60 / pop60,
+         ratio70 = popl70 / pop70,
+         ratio80 = popl80 / pop80,
+         ratio90 = popl90 / pop90)
+big_right <- map@data
+
+# Fortify
+mapf <- fortify(map, region = 'id')
+
+library(ggthemes)
+# Define variable for plotting var
+plot_var <- function(var = 'pop', return_table = 0){
+  sub_map <- mapf
+  right <- big_right[,c('id', var)]
+  sub_map <- left_join(sub_map, right)
+  names(sub_map)[ncol(sub_map)] <- 'var'
+  if(return_table > 0){
+    out <- big_right[,c('id', 'NAMEUNIT', var)]
+    names(out)[ncol(out)] <- 'var'
+    out <- out %>% arrange(desc(var))
+    names(out)[ncol(out)] <- var
+    out$pop <- big_right$pop
+    names(out)[2] <- 'Nom'
+    out <- out[1:return_table,]
+    out
+  } else {
+    ggplot(data = sub_map,
+         aes(x = long,
+             y = lat,
+             group = group,
+             fill = var)) +
+    geom_polygon(color = 'black',
+         size = 0.2) +
+    theme_map() +
+    scale_fill_gradientn(name ='',
+                         colors  = rev(RColorBrewer::brewer.pal(n = 9, name = 'Spectral'))) +
+    theme(plot.title = element_text(size = 16),
+          legend.position = 'right')
+  }
+}
+```
+
+# Population
+
+```{r}
+plot_var('pop') +
+  labs(title = 'Population per municipality')
+```
+
+
+# Population density
+
+```{r}
+plot_var('pop_per_km') +
+  labs(title = 'Population per sq km')
+```
+
+Top 10:
+
+```{r}
+plot_var('pop_per_km', return_table = 10)
+```
+
+
+# Population density of 60+ year-olds
+
+```{r}
+plot_var('pop60_per_km') +
+  labs(title = 'Population of people aged 60+ per sq km')
+```
+
+Top 10:
+
+```{r}
+plot_var('pop60_per_km', return_table = 10)
+```
+
+
+# Population density of 70+ year-olds
+
+```{r}
+plot_var('pop70_per_km') +
+  labs(title = 'Population of people aged 70+ per sq km')
+```
+
+Top 10:
+
+```{r}
+plot_var('pop70_per_km', return_table = 10)
+```
+
+
+# Population density of 80+ year-olds
+
+```{r}
+plot_var('pop80_per_km') +
+  labs(title = 'Population of people aged 80+ per sq km')
+```
+
+Top 10:
+
+```{r}
+plot_var('pop80_per_km', return_table = 10)
+```
+
+
+# Ratio of under-60s to 60+
+
+(ie, ratio of protectors to protected)
+
+```{r}
+plot_var('ratio60') +
+  labs(title = 'Ratio of under-60s to 60+')
+```
+
+Top 10:
+
+```{r}
+plot_var('ratio60', return_table = 10)
+```
+
+
+
+# Ratio of under-70s to 70+
+
+(ie, ratio of protectors to protected)
+
+```{r}
+plot_var('ratio70') +
+  labs(title = 'Ratio of under-70s to 70+')
+```
+
+Top 10:
+
+```{r}
+plot_var('ratio70', return_table = 10)
+```
+
+
+# Ratio of under-80s to 80+
+
+(ie, ratio of protectors to protected)
+
+```{r}
+plot_var('ratio80') +
+  labs(title = 'Ratio of under-80s to 80+')
+```
+
+Top 10:
+
+```{r}
+plot_var('ratio80', return_table = 10)
+```
