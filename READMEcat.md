@@ -126,8 +126,18 @@ big_right <- map@data
 mapf <- fortify(map, region = 'id')
 
 library(ggthemes)
+
+cut_pretty <- function(x, breaks, collapse=" to ", ...) {
+  it_breaks <- itertools2::ipairwise(breaks)
+  breaks_pretty <- sapply(it_breaks, paste, collapse=collapse)
+  breaks[1] <- floor(breaks[1])
+  breaks[length(breaks)] <- ceiling(breaks[length(breaks)]) 
+  breaks[2:(length(breaks)-1)] <- round(breaks[2:(length(breaks)-1)])
+  cut(x, breaks=breaks, labels=breaks_pretty, ...)
+}
+
 # Define variable for plotting var
-plot_var <- function(var = 'pop', return_table = 0){
+plot_var <- function(var = 'pop', return_table = 0, quant = T){
   sub_map <- mapf
   right <- big_right[,c('id', var)]
   sub_map <- left_join(sub_map, right)
@@ -142,18 +152,37 @@ plot_var <- function(var = 'pop', return_table = 0){
     out <- out[1:return_table,]
     out
   } else {
-    ggplot(data = sub_map,
+    if(quant){
+      x <-cut_pretty(sub_map$var, breaks = quantile(sub_map$var))
+      sub_map$var <- x
+      cols <-  rev(RColorBrewer::brewer.pal(n = 4, name = 'Spectral'))
+       ggplot(data = sub_map,
+         aes(x = long,
+             y = lat,
+             group = group,
+             fill = factor(var))) +
+    geom_polygon(color = 'black',
+         size = 0.2) +
+         theme_map() +
+    theme(plot.title = element_text(size = 16),
+          legend.position = 'right') +
+        scale_fill_manual(name ='',
+                         values  = cols)
+    } else {
+      cols <-  rev(RColorBrewer::brewer.pal(n = 9, name = 'Spectral'))
+      ggplot(data = sub_map,
          aes(x = long,
              y = lat,
              group = group,
              fill = var)) +
     geom_polygon(color = 'black',
          size = 0.2) +
-    theme_map() +
-    scale_fill_gradientn(name ='',
-                         colors  = rev(RColorBrewer::brewer.pal(n = 9, name = 'Spectral'))) +
+            theme_map() +
     theme(plot.title = element_text(size = 16),
-          legend.position = 'right')
+          legend.position = 'right') +
+        scale_fill_gradientn(name ='',
+                         colors  = cols)
+    }
   }
 }
 ```
