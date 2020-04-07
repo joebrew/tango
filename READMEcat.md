@@ -129,7 +129,80 @@ big_right <- map@data
 mapf <- fortify(map, region = 'id')
 
 library(ggthemes)
+```
 
+# 50 -/+ ratio
+
+``` r
+map@data$ratiox <- ifelse(map@data$ratio50 < 1,
+                          '0-1',
+                          ifelse(map@data$ratio50 <2,
+                                 '1-2',
+                                 ifelse(map@data$ratio50 < 3,
+                                        '2-3',
+                                        ifelse(map@data$ratio50 < 4,
+                                               '3-4',
+                                               '4+'))))
+
+shp <- mapf %>%
+  left_join(map@data[,c('id', 'ratiox')])
+
+cols <-  rev(RColorBrewer::brewer.pal(n = 5, name = 'Spectral'))
+ggplot(data = shp,
+         aes(x = long,
+             y = lat,
+             group = group,
+             fill = factor(ratiox))) +
+    geom_polygon(color = 'black',
+         size = 0.2) +
+         theme_map() +
+    theme(plot.title = element_text(size = 16),
+          legend.position = 'right') +
+        scale_fill_manual(name ='',
+                         values  = cols) +
+  labs(title = 'Ratio of people younger than 50 to people older than 50')
+```
+
+<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
+
+Table of cut-offs and population affected. How to read:
+
+\-Cut off: We apply measures to all towns with this ratio, or lower, of
+young to old -Below: Means that the measures are applied -Above: means
+that the measures are not applied.
+
+``` r
+pop <- sum(map@data$pop)
+out_list <- list()
+cut_offs <- c(1, 1.5, 1.7, 1.8, 1.9, 2, 3, 4, 5)
+for(i in 1:length(cut_offs)){
+  this_cut_off <- cut_offs[i]
+  out <- data.frame(cut_off = this_cut_off)
+  out$municipalities_below_cut_off <- length(map@data$pop[map@data$ratio50 < this_cut_off])
+  out$municipalities_above_cut_off <- length(map@data$pop[map@data$ratio50 >= this_cut_off])
+  out$pop_below_cut_off <- sum(map@data$pop[map@data$ratio50 < this_cut_off])
+  out$pop_above_cut_off <- sum(map@data$pop[map@data$ratio50 >= this_cut_off])
+  out$p_below_cut_off <- round(out$pop_below_cut_off / pop * 100, digits = 2)
+  out$p_above_cut_off <- round(out$pop_above_cut_off / pop * 100, digits = 2)
+  out_list[[i]] <- out
+}
+out <- bind_rows(out_list)
+knitr::kable(out)
+```
+
+| cut\_off | municipalities\_below\_cut\_off | municipalities\_above\_cut\_off | pop\_below\_cut\_off | pop\_above\_cut\_off | p\_below\_cut\_off | p\_above\_cut\_off |
+| -------: | ------------------------------: | ------------------------------: | -------------------: | -------------------: | -----------------: | -----------------: |
+|      1.0 |                             113 |                             834 |                38043 |              7480591 |               0.51 |              99.49 |
+|      1.5 |                             414 |                             533 |               279002 |              7239632 |               3.71 |              96.29 |
+|      1.7 |                             549 |                             398 |              2245397 |              5273237 |              29.86 |              70.14 |
+|      1.8 |                             606 |                             341 |              2871524 |              4647110 |              38.19 |              61.81 |
+|      1.9 |                             668 |                             279 |              3653792 |              3864842 |              48.60 |              51.40 |
+|      2.0 |                             728 |                             219 |              4668010 |              2850624 |              62.09 |              37.91 |
+|      3.0 |                             936 |                              11 |              7481603 |                37031 |              99.51 |               0.49 |
+|      4.0 |                             946 |                               1 |              7515730 |                 2904 |              99.96 |               0.04 |
+|      5.0 |                             947 |                               0 |              7518634 |                    0 |             100.00 |               0.00 |
+
+``` r
 cut_pretty <- function(x, breaks, collapse=" to ", ...) {
   breaks[1] <- floor(breaks[1])
   breaks[length(breaks)] <- ceiling(breaks[length(breaks)]) 
@@ -141,7 +214,7 @@ cut_pretty <- function(x, breaks, collapse=" to ", ...) {
 }
 
 # Define variable for plotting var
-plot_var <- function(var = 'pop', return_table = 0, quant = T){
+plot_var <- function(var = 'pop', return_table = 0, quant = T, n = 5){
   sub_map <- mapf
   right <- big_right[,c('id', var)]
   sub_map <- left_join(sub_map, right)
@@ -157,7 +230,7 @@ plot_var <- function(var = 'pop', return_table = 0, quant = T){
     out
   } else {
     if(quant){
-      x <-cut_pretty(sub_map$var, breaks = unique(unique(quantile(right[,2]))))
+      x <-cut_pretty(sub_map$var, breaks = unique(unique(quantile(right[,2], probs = seq(0, 1, length = n)))))
       sub_map$var <- x
       cols <-  rev(RColorBrewer::brewer.pal(n = 4, name = 'Spectral'))
        ggplot(data = sub_map,
@@ -198,7 +271,7 @@ plot_var('pop') +
   labs(title = 'Population per municipality')
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
 
 # Population density
 
@@ -207,7 +280,7 @@ plot_var('pop_per_km') +
   labs(title = 'Population per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" />
 
 Top 10:
 
@@ -233,7 +306,7 @@ plot_var('pop50_per_km') +
   labs(title = 'Population of people aged 50+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-10-1.png" width="100%" />
 
 Top 10:
 
@@ -259,7 +332,7 @@ plot_var('pop60_per_km') +
   labs(title = 'Population of people aged 60+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-12-1.png" width="100%" />
 
 Top 10:
 
@@ -285,7 +358,7 @@ plot_var('pop70_per_km') +
   labs(title = 'Population of people aged 70+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-14-1.png" width="100%" />
 
 Top 10:
 
@@ -311,7 +384,7 @@ plot_var('pop80_per_km') +
   labs(title = 'Population of people aged 80+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-16-1.png" width="100%" />
 
 Top 10:
 
@@ -335,11 +408,11 @@ plot_var('pop80_per_km', return_table = 10)
 (ie, ratio of protectors to protected)
 
 ``` r
-plot_var('ratio50') +
+plot_var('ratio50', n = 10) +
   labs(title = 'Ratio of under-50s to 50+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-18-1.png" width="100%" />
 
 Top 10:
 
@@ -367,7 +440,7 @@ plot_var('ratio60') +
   labs(title = 'Ratio of under-60s to 60+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-17-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-20-1.png" width="100%" />
 
 Top 10:
 
@@ -395,7 +468,7 @@ plot_var('ratio70') +
   labs(title = 'Ratio of under-70s to 70+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-19-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-22-1.png" width="100%" />
 
 Top 10:
 
@@ -423,7 +496,7 @@ plot_var('ratio80') +
   labs(title = 'Ratio of under-80s to 80+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-21-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-24-1.png" width="100%" />
 
 Top 10:
 
