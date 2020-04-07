@@ -178,29 +178,31 @@ cut_offs <- c(1, 1.5, 1.7, 1.8, 1.9, 2, 3, 4, 5)
 for(i in 1:length(cut_offs)){
   this_cut_off <- cut_offs[i]
   out <- data.frame(cut_off = this_cut_off)
-  out$municipalities_below_cut_off <- length(map@data$pop[map@data$ratio50 < this_cut_off])
-  out$municipalities_above_cut_off <- length(map@data$pop[map@data$ratio50 >= this_cut_off])
+  out$under_50s_affected <- sum(map@data$popl50[map@data$ratio50 < this_cut_off])
+  out$over_50s_protected <- sum(map@data$pop50[map@data$ratio50 < this_cut_off])
   out$pop_below_cut_off <- sum(map@data$pop[map@data$ratio50 < this_cut_off])
   out$pop_above_cut_off <- sum(map@data$pop[map@data$ratio50 >= this_cut_off])
   out$p_below_cut_off <- round(out$pop_below_cut_off / pop * 100, digits = 2)
   out$p_above_cut_off <- round(out$pop_above_cut_off / pop * 100, digits = 2)
+  out$municipalities_below_cut_off <- length(map@data$pop[map@data$ratio50 < this_cut_off])
+  out$municipalities_above_cut_off <- length(map@data$pop[map@data$ratio50 >= this_cut_off])
   out_list[[i]] <- out
 }
 out <- bind_rows(out_list)
 knitr::kable(out)
 ```
 
-| cut\_off | municipalities\_below\_cut\_off | municipalities\_above\_cut\_off | pop\_below\_cut\_off | pop\_above\_cut\_off | p\_below\_cut\_off | p\_above\_cut\_off |
-| -------: | ------------------------------: | ------------------------------: | -------------------: | -------------------: | -----------------: | -----------------: |
-|      1.0 |                             113 |                             834 |                38043 |              7480591 |               0.51 |              99.49 |
-|      1.5 |                             414 |                             533 |               279002 |              7239632 |               3.71 |              96.29 |
-|      1.7 |                             549 |                             398 |              2245397 |              5273237 |              29.86 |              70.14 |
-|      1.8 |                             606 |                             341 |              2871524 |              4647110 |              38.19 |              61.81 |
-|      1.9 |                             668 |                             279 |              3653792 |              3864842 |              48.60 |              51.40 |
-|      2.0 |                             728 |                             219 |              4668010 |              2850624 |              62.09 |              37.91 |
-|      3.0 |                             936 |                              11 |              7481603 |                37031 |              99.51 |               0.49 |
-|      4.0 |                             946 |                               1 |              7515730 |                 2904 |              99.96 |               0.04 |
-|      5.0 |                             947 |                               0 |              7518634 |                    0 |             100.00 |               0.00 |
+| cut\_off | under\_50s\_affected | over\_50s\_protected | pop\_below\_cut\_off | pop\_above\_cut\_off | p\_below\_cut\_off | p\_above\_cut\_off | municipalities\_below\_cut\_off | municipalities\_above\_cut\_off |
+| -------: | -------------------: | -------------------: | -------------------: | -------------------: | -----------------: | -----------------: | ------------------------------: | ------------------------------: |
+|      1.0 |                17661 |                20382 |                38043 |              7480591 |               0.51 |              99.49 |                             113 |                             834 |
+|      1.5 |               152255 |               126747 |               279002 |              7239632 |               3.71 |              96.29 |                             414 |                             533 |
+|      1.7 |              1351422 |               893975 |              2245397 |              5273237 |              29.86 |              70.14 |                             549 |                             398 |
+|      1.8 |              1749223 |              1122301 |              2871524 |              4647110 |              38.19 |              61.81 |                             606 |                             341 |
+|      1.9 |              2257890 |              1395902 |              3653792 |              3864842 |              48.60 |              51.40 |                             668 |                             279 |
+|      2.0 |              2926866 |              1741144 |              4668010 |              2850624 |              62.09 |              37.91 |                             728 |                             219 |
+|      3.0 |              4877804 |              2603799 |              7481603 |                37031 |              99.51 |               0.49 |                             936 |                              11 |
+|      4.0 |              4904368 |              2611362 |              7515730 |                 2904 |              99.96 |               0.04 |                             946 |                               1 |
+|      5.0 |              4906724 |              2611910 |              7518634 |                    0 |             100.00 |               0.00 |                             947 |                               0 |
 
 ``` r
 cut_pretty <- function(x, breaks, collapse=" to ", ...) {

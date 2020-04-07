@@ -195,12 +195,14 @@ cut_offs <- c(1, 1.5, 1.7, 1.8, 1.9, 2, 3, 4, 5)
 for(i in 1:length(cut_offs)){
   this_cut_off <- cut_offs[i]
   out <- data.frame(cut_off = this_cut_off)
-  out$municipalities_below_cut_off <- length(map@data$pop[map@data$ratio50 < this_cut_off])
-  out$municipalities_above_cut_off <- length(map@data$pop[map@data$ratio50 >= this_cut_off])
+  out$under_50s_affected <- sum(map@data$popl50[map@data$ratio50 < this_cut_off])
+  out$over_50s_protected <- sum(map@data$pop50[map@data$ratio50 < this_cut_off])
   out$pop_below_cut_off <- sum(map@data$pop[map@data$ratio50 < this_cut_off])
   out$pop_above_cut_off <- sum(map@data$pop[map@data$ratio50 >= this_cut_off])
   out$p_below_cut_off <- round(out$pop_below_cut_off / pop * 100, digits = 2)
   out$p_above_cut_off <- round(out$pop_above_cut_off / pop * 100, digits = 2)
+  out$municipalities_below_cut_off <- length(map@data$pop[map@data$ratio50 < this_cut_off])
+  out$municipalities_above_cut_off <- length(map@data$pop[map@data$ratio50 >= this_cut_off])
   out_list[[i]] <- out
 }
 out <- bind_rows(out_list)
