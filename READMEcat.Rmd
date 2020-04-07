@@ -84,9 +84,9 @@ make_plot <- function(cut_off = 30){
   title(main = paste0(max(round(sub_pop$cp)), '% of Catalans live in the red area (', space_take_up, ' % of area)' ))
 }
 
-for(i in c( seq(30, 90, by = 10), 92, 94, 96, 98, 99)){
-  make_plot(cut_off = i)
-}
+# for(i in c( seq(30, 90, by = 10), 92, 94, 96, 98, 99)){
+#   make_plot(cut_off = i)
+# }
 
 ```
 
@@ -110,10 +110,12 @@ right <- census %>%
   group_by(id) %>%
   summarise(pop = sum(total, na.rm = TRUE),
             pop60 = sum(total[edad >= 60], na.rm = TRUE),
+            pop50 = sum(total[edad >= 50], na.rm = TRUE),
             pop70 = sum(total[edad >= 70], na.rm = TRUE),
             pop80 = sum(total[edad >= 80], na.rm = TRUE),
             pop90 = sum(total[edad >= 90], na.rm = TRUE),
             popl60 = sum(total[edad < 60], na.rm = TRUE),
+            popl50 = sum(total[edad < 50], na.rm = TRUE),
             popl70 = sum(total[edad < 70], na.rm = TRUE),
             popl80 = sum(total[edad < 80], na.rm = TRUE),
             popl90 = sum(total[edad < 90], na.rm = TRUE))
@@ -124,15 +126,18 @@ map@data <-
 
 map@data <- map@data %>%
   mutate(pop_per_km = pop / area_km,
+         pop50_per_km = pop50 / area_km,
          pop60_per_km = pop60 / area_km,
          pop70_per_km = pop70 / area_km,
          pop80_per_km = pop80 / area_km,
          pop90_per_km = pop90 / area_km,
+         popl50_per_km = popl50 / area_km,
          popl60_per_km = popl60 / area_km,
          popl70_per_km = popl70 / area_km,
          popl80_per_km = popl80 / area_km,
          popl90_per_km = popl90 / area_km) %>%
   mutate(ratio60 = popl60 / pop60,
+         ratio50 = popl50 / pop50,
          ratio70 = popl70 / pop70,
          ratio80 = popl80 / pop80,
          ratio90 = popl90 / pop90)
@@ -144,11 +149,12 @@ mapf <- fortify(map, region = 'id')
 library(ggthemes)
 
 cut_pretty <- function(x, breaks, collapse=" to ", ...) {
-  it_breaks <- itertools2::ipairwise(breaks)
-  breaks_pretty <- sapply(it_breaks, paste, collapse=collapse)
   breaks[1] <- floor(breaks[1])
   breaks[length(breaks)] <- ceiling(breaks[length(breaks)]) 
   breaks[2:(length(breaks)-1)] <- round(breaks[2:(length(breaks)-1)])
+  breaks <- unique(breaks)
+  it_breaks <- itertools2::ipairwise(breaks)
+  breaks_pretty <- sapply(it_breaks, paste, collapse=collapse)
   cut(x, breaks=breaks, labels=breaks_pretty, ...)
 }
 
@@ -169,7 +175,7 @@ plot_var <- function(var = 'pop', return_table = 0, quant = T){
     out
   } else {
     if(quant){
-      x <-cut_pretty(sub_map$var, breaks = quantile(sub_map$var))
+      x <-cut_pretty(sub_map$var, breaks = unique(unique(quantile(right[,2]))))
       sub_map$var <- x
       cols <-  rev(RColorBrewer::brewer.pal(n = 4, name = 'Spectral'))
        ggplot(data = sub_map,
@@ -225,6 +231,21 @@ plot_var('pop_per_km', return_table = 10)
 ```
 
 
+# Population density of 50+ year-olds
+
+```{r}
+plot_var('pop50_per_km') +
+  labs(title = 'Population of people aged 50+ per sq km')
+```
+
+Top 10:
+
+```{r}
+plot_var('pop50_per_km', return_table = 10)
+```
+
+
+
 # Population density of 60+ year-olds
 
 ```{r}
@@ -265,6 +286,24 @@ Top 10:
 ```{r}
 plot_var('pop80_per_km', return_table = 10)
 ```
+
+
+
+# Ratio of under-50s to 50+
+
+(ie, ratio of protectors to protected)
+
+```{r}
+plot_var('ratio50') +
+  labs(title = 'Ratio of under-50s to 50+')
+```
+
+Top 10:
+
+```{r}
+plot_var('ratio50', return_table = 10)
+```
+
 
 
 # Ratio of under-60s to 60+

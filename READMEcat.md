@@ -67,12 +67,10 @@ make_plot <- function(cut_off = 30){
   title(main = paste0(max(round(sub_pop$cp)), '% of Catalans live in the red area (', space_take_up, ' % of area)' ))
 }
 
-for(i in c( seq(30, 90, by = 10), 92, 94, 96, 98, 99)){
-  make_plot(cut_off = i)
-}
+# for(i in c( seq(30, 90, by = 10), 92, 94, 96, 98, 99)){
+#   make_plot(cut_off = i)
+# }
 ```
-
-<img src="man/figures/README-unnamed-chunk-2-1.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-2.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-3.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-4.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-5.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-6.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-7.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-8.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-9.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-10.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-11.png" width="100%" /><img src="man/figures/README-unnamed-chunk-2-12.png" width="100%" />
 
 ## Plots for 2020-04-06
 
@@ -94,10 +92,12 @@ right <- census %>%
   group_by(id) %>%
   summarise(pop = sum(total, na.rm = TRUE),
             pop60 = sum(total[edad >= 60], na.rm = TRUE),
+            pop50 = sum(total[edad >= 50], na.rm = TRUE),
             pop70 = sum(total[edad >= 70], na.rm = TRUE),
             pop80 = sum(total[edad >= 80], na.rm = TRUE),
             pop90 = sum(total[edad >= 90], na.rm = TRUE),
             popl60 = sum(total[edad < 60], na.rm = TRUE),
+            popl50 = sum(total[edad < 50], na.rm = TRUE),
             popl70 = sum(total[edad < 70], na.rm = TRUE),
             popl80 = sum(total[edad < 80], na.rm = TRUE),
             popl90 = sum(total[edad < 90], na.rm = TRUE))
@@ -108,15 +108,18 @@ map@data <-
 
 map@data <- map@data %>%
   mutate(pop_per_km = pop / area_km,
+         pop50_per_km = pop50 / area_km,
          pop60_per_km = pop60 / area_km,
          pop70_per_km = pop70 / area_km,
          pop80_per_km = pop80 / area_km,
          pop90_per_km = pop90 / area_km,
+         popl50_per_km = popl50 / area_km,
          popl60_per_km = popl60 / area_km,
          popl70_per_km = popl70 / area_km,
          popl80_per_km = popl80 / area_km,
          popl90_per_km = popl90 / area_km) %>%
   mutate(ratio60 = popl60 / pop60,
+         ratio50 = popl50 / pop50,
          ratio70 = popl70 / pop70,
          ratio80 = popl80 / pop80,
          ratio90 = popl90 / pop90)
@@ -128,11 +131,12 @@ mapf <- fortify(map, region = 'id')
 library(ggthemes)
 
 cut_pretty <- function(x, breaks, collapse=" to ", ...) {
-  it_breaks <- itertools2::ipairwise(breaks)
-  breaks_pretty <- sapply(it_breaks, paste, collapse=collapse)
   breaks[1] <- floor(breaks[1])
   breaks[length(breaks)] <- ceiling(breaks[length(breaks)]) 
   breaks[2:(length(breaks)-1)] <- round(breaks[2:(length(breaks)-1)])
+  breaks <- unique(breaks)
+  it_breaks <- itertools2::ipairwise(breaks)
+  breaks_pretty <- sapply(it_breaks, paste, collapse=collapse)
   cut(x, breaks=breaks, labels=breaks_pretty, ...)
 }
 
@@ -153,7 +157,7 @@ plot_var <- function(var = 'pop', return_table = 0, quant = T){
     out
   } else {
     if(quant){
-      x <-cut_pretty(sub_map$var, breaks = quantile(sub_map$var))
+      x <-cut_pretty(sub_map$var, breaks = unique(unique(quantile(right[,2]))))
       sub_map$var <- x
       cols <-  rev(RColorBrewer::brewer.pal(n = 4, name = 'Spectral'))
        ggplot(data = sub_map,
@@ -222,6 +226,32 @@ plot_var('pop_per_km', return_table = 10)
 10 08180                  Ripollet   8481.794 3696
 ```
 
+# Population density of 50+ year-olds
+
+``` r
+plot_var('pop50_per_km') +
+  labs(title = 'Population of people aged 50+ per sq km')
+```
+
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+
+Top 10:
+
+``` r
+plot_var('pop50_per_km', return_table = 10)
+      id                       Nom pop50_per_km  pop
+1  08101 L'Hospitalet de Llobregat     6896.603 5728
+2  08019                 Barcelona     6358.540 2257
+3  08245  Santa Coloma de Gramenet     5766.728 1193
+4  08904          Badia del Vallès     5177.355  866
+5  08172             Premià de Mar     4975.606 1091
+6  08073     Cornellà de Llobregat     4473.488  162
+7  08077    Esplugues de Llobregat     4051.669  201
+8  08015                  Badalona     3598.046 2237
+9  08194       Sant Adrià de Besòs     2995.734 1510
+10 08118                 El Masnou     2562.285 3696
+```
+
 # Population density of 60+ year-olds
 
 ``` r
@@ -229,7 +259,7 @@ plot_var('pop60_per_km') +
   labs(title = 'Population of people aged 60+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
 
 Top 10:
 
@@ -255,7 +285,7 @@ plot_var('pop70_per_km') +
   labs(title = 'Population of people aged 70+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
 
 Top 10:
 
@@ -281,7 +311,7 @@ plot_var('pop80_per_km') +
   labs(title = 'Population of people aged 80+ per sq km')
 ```
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
 
 Top 10:
 
@@ -300,6 +330,34 @@ plot_var('pop80_per_km', return_table = 10)
 10 08118                 El Masnou     363.6092 3696
 ```
 
+# Ratio of under-50s to 50+
+
+(ie, ratio of protectors to protected)
+
+``` r
+plot_var('ratio50') +
+  labs(title = 'Ratio of under-50s to 50+')
+```
+
+<img src="man/figures/README-unnamed-chunk-15-1.png" width="100%" />
+
+Top 10:
+
+``` r
+plot_var('ratio50', return_table = 10)
+      id                      Nom  ratio50  pop
+1  43109      La Pobla de Mafumet 4.299270 5728
+2  25110                 Guissona 3.985030 2257
+3  08167                  Polinyà 3.712624 1193
+4  43100           Els Pallaresos 3.465711  866
+5  17049                    Celrà 3.395455 1091
+6  43122                    Renau 3.281250  162
+7  25228             Torrefarrera 3.272906  201
+8  43103                 Perafort 3.203333 2237
+9  43119                Puigpelat 3.160643 1510
+10 08162 Els Hostalets de Pierola 3.072136 3696
+```
+
 # Ratio of under-60s to 60+
 
 (ie, ratio of protectors to protected)
@@ -309,7 +367,7 @@ plot_var('ratio60') +
   labs(title = 'Ratio of under-60s to 60+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-17-1.png" width="100%" />
 
 Top 10:
 
@@ -337,7 +395,7 @@ plot_var('ratio70') +
   labs(title = 'Ratio of under-70s to 70+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-19-1.png" width="100%" />
 
 Top 10:
 
@@ -365,7 +423,7 @@ plot_var('ratio80') +
   labs(title = 'Ratio of under-80s to 80+')
 ```
 
-<img src="man/figures/README-unnamed-chunk-17-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-21-1.png" width="100%" />
 
 Top 10:
 
